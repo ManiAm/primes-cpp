@@ -1,0 +1,10 @@
+# conanfile.txt (Conan v2)
+[requires]
+catch2/3.9.1
+fmt/11.2.0
+
+[generators]
+# For Makefile/CLI workflows:
+PkgConfigDeps
+VirtualBuildEnv
+VirtualRunEnv

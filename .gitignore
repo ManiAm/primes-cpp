@@ -1,0 +1,6 @@
+build/
+build-cov/
+coverage/
+test-results/
+cppcheck.xml
+dist/
