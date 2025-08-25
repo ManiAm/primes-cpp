@@ -30,7 +30,7 @@ This directory contains entrypoints and runnable binaries. The `main.cpp` file i
 
 ### tests/
 
-This directory contains unit tests for validating the behavior of code in `src/`. The project uses [Catch2](https://github.com/catchorg/Catch2) test framework, so `test_calc.cpp` both defines test cases and provides the test runner. Tests produce JUnit XML reports, which CI systems can use to visualize pass/fail status and track trends. The Catch2 single-header dependency can be pulled in automatically using the Makefile’s deps target or vendored into `tests/vendor/` to avoid network fetches during CI runs.
+This directory contains unit tests for validating the behavior of code in `src/`. The project uses [Catch2](https://github.com/catchorg/Catch2) test framework, so `test_calc.cpp` both defines test cases and provides the test runner. Tests produce JUnit XML reports, which CI systems can use to visualize pass/fail status and track trends.
 
 ### Makefile
 
@@ -136,13 +136,11 @@ The `make package` target bundles everything produced by the pipeline into a sin
 
 ## CI Pipeline
 
-A `Jenkinsfile` is a plain text file, written in Groovy-based syntax, that defines a Jenkins pipeline as code. It specifies the stages, steps, and environment required to build, test, and deploy an application, providing a reproducible and version-controlled automation process directly alongside the source code. By treating the pipeline as code, teams gain consistency, collaboration, and traceability, since changes to the CI process are reviewed, versioned, and managed just like application code. The Jenkinsfile supports both declarative and scripted styles, integrates with webhooks for automated triggers, and serves as a cornerstone of modern Jenkins-based CI workflows.
-
-Placing the Jenkinsfile within the application repository is widely regarded as best practice. Keeping the pipeline definition alongside the code ensures that build and deployment logic evolves in lockstep with the application itself, minimizing the risk of mismatches. Each branch, tag, or commit can carry its own pipeline definition, making the CI process fully reproducible and context-aware. This approach empowers developers to maintain and evolve their pipelines while ensuring that automation remains tightly aligned with the state of the codebase.
+A `Jenkinsfile` is a plain text file, written in Groovy-based syntax, that defines a Jenkins pipeline as code. It specifies the stages, steps, and environment required to build, test, and deploy an application, providing a reproducible and version-controlled automation process directly alongside the source code. By treating the pipeline as code, teams gain consistency, collaboration, and traceability, since changes to the CI process are reviewed, versioned, and managed just like application code. Each branch, tag, or commit can carry its own pipeline definition, making the CI process fully reproducible and context-aware.
 
 ### Checkout
 
-The pipeline begins by fetching the exact commit to build and setting up a clean, reproducible workspace. A shallow clone is usually sufficient unless full history is required. Submodules are initialized, and lightweight setup tasks such as `make deps` can fetch header-only libraries. Build caches (for example, `ccache`) may be restored to speed up subsequent steps. It is also good practice to record immutable build metadata (commit SHA, branch or PR number, build identifier, and tool versions) so that results are traceable and reproducible.
+The pipeline begins by fetching the exact commit to build and setting up a clean, reproducible workspace. A shallow clone is usually sufficient unless full history is required. Build caches (for example, `ccache`) may be restored to speed up subsequent steps. It is also good practice to record immutable build metadata (commit SHA, branch or PR number, build identifier, and tool versions) so that results are traceable and reproducible.
 
 ### Linting
 
@@ -181,3 +179,9 @@ Publishing makes validated artifacts available to others by promoting them to th
 **Release**
 
 A release marks the formal distribution of a software version to end users, distinguishing it from internal builds or unpublished artifacts. A release is both a technical milestone and a product event, usually represented by a semantic version tag (e.g., `v1.2.0`) in source control. It should be immutable, reproducible, and traceable to a specific commit and build pipeline. A proper release includes release notes summarizing new features, bug fixes, and breaking changes, ideally auto-generated from commits or pull requests. Distribution is handled through established channels such as GitHub/GitLab Releases, customer portals, or internal delivery pipelines. In mature CI processes, releases are gated by quality controls (security scans, compliance checks, stakeholder approvals) and may trigger downstream workflows such as deployment to production or notifications to customers.
+
+## Ephemeral Docker Build Environment
+
+All build, test, and analysis stages are executed inside ephemeral Docker containers rather than directly on the agents. This design ensures that the host operating systems remain free of build toolchains, language runtimes, or dependency pollution. Each pipeline stage specifies a Docker image appropriate for the task. The Jenkins Docker plugin mounts the workspace into these containers, executes the step, and then disposes of the container after the stage completes.
+
+This approach provides several benefits. First, it guarantees a consistent and reproducible build environment across agents regardless of their base operating system. Second, it allows different stages of the same pipeline to use different toolchains without conflict, making polyglot builds straightforward. Finally, because the containers are ephemeral, there is no risk of residual state between builds; every execution starts from a clean image, ensuring high fidelity in test and coverage results.
