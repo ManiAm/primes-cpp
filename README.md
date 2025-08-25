@@ -31,7 +31,7 @@ This directory contains unit tests for validating the behavior of code in `src/`
 
 ### Makefile
 
-The Makefile defines one target per CI/CD pipeline stage: lint, static, build, test, coverage, and release. This design ensures that the local developer workflow matches the pipeline exactly. The compiler can be switched easily (`CXX=clang++` or `CXX=g++`) without modifying the Makefile itself.
+The Makefile defines one target per CI/CD pipeline stage: lint, static, build, test, coverage, and package. This design ensures that the local developer workflow matches the pipeline exactly. The compiler can be switched easily (`CXX=clang++` or `CXX=g++`) without modifying the Makefile itself.
 
 ## Header File Dependencies
 
@@ -73,13 +73,23 @@ Unit tests validate the behavior of the code. Tests should be fast, hermetic, an
 
 Code coverage measures how much of the source is exercised by tests, reducing the risk of untested regressions. The project can be built with coverage flag (`--coverage`), after which tests are executed and coverage reports generated using `gcovr`. Reports should include both human-readable HTML and machine-readable formats (e.g., Cobertura XML) for automated enforcement. Coverage gates are best applied pragmatically: enforce no decrease relative to main or set thresholds per change, rather than rigid global minimums that encourage low-value tests.
 
-### Package
+### Distribution Workflow
 
-When builds and tests succeed, outputs are bundled into distributable artifacts. These may be compressed archives (tarball/zip), operating system packages (DEB/RPM), or container images. Artifacts should be versioned using semantic versioning and commit metadata (e.g., `1.2.0+abc123`), and accompanied by integrity checks (SHA-256). For supply-chain integrity, additional assets such as SBOMs (via syft) and signatures (via cosign) may be generated. Packages should remain minimal (containing only what consumers require) and include documentation for runtime dependencies.
+- Package → Create artifacts
+- Publish → Push artifacts to repositories/registries
+- Release → Tag and announce an official version for end users
 
-### Publish
+**Package**
 
-The final stage promotes validated artifacts to their destinations under controlled conditions (typically on protected branches or tags). Destinations might include GitHub Releases, package repositories (e.g., Artifactory, Nexus), or container registries. Credentials used for publishing should follow the principle of least privilege. Releases should be annotated with changelogs and linked back to the build for traceability. Optionally, provenance metadata (SLSA attestations), SBOMs, and cryptographic signatures can be attached so downstream users can verify authenticity and integrity.
+When builds and tests succeed, outputs are bundled into distributable artifacts. These may include compressed archives (e.g., tarballs, ZIPs), operating system packages (DEB/RPM), or container images. Each artifact should be versioned using semantic versioning with optional commit metadata (e.g., `1.2.0+abc123`) to ensure traceability. To guarantee integrity, checksums (e.g., SHA-256) should be generated, and for supply chain security, additional metadata such as SBOMs (via tools like `syft`) and cryptographic signatures (via tools like `cosign`) can be attached. A well-packaged artifact is minimal containing only the files and dependencies required by consumers and should include concise documentation or metadata describing runtime requirements.
+
+**Publish**
+
+Publishing makes validated artifacts available to others by promoting them to their designated destinations under controlled conditions. Targets may include package repositories (e.g., Artifactory, Nexus, PyPI, Maven Central), container registries (e.g., Docker Hub, ECR, GCR), or distribution platforms such as GitHub Releases. Publishing credentials must follow the principle of least privilege and be rotated regularly. Published artifacts should be annotated with changelogs, version tags, and links back to the originating build for full traceability. To strengthen consumer trust, optional metadata such as SLSA provenance attestations, SBOMs, and digital signatures should be attached so downstream systems and users can verify authenticity and integrity before deployment.
+
+**Release**
+
+A release marks the formal distribution of a software version to end users, distinguishing it from internal builds or unpublished artifacts. A release is both a technical milestone and a product event, usually represented by a semantic version tag (e.g., `v1.2.0`) in source control. It should be immutable, reproducible, and traceable to a specific commit and build pipeline. A proper release includes release notes summarizing new features, bug fixes, and breaking changes, ideally auto-generated from commits or pull requests. Distribution is handled through established channels such as GitHub/GitLab Releases, customer portals, or internal delivery pipelines. In mature CI/CD processes, releases are gated by quality controls (security scans, compliance checks, stakeholder approvals) and may trigger downstream workflows such as deployment to production or notifications to customers.
 
 ## Setting up Conan
 
@@ -161,6 +171,6 @@ Open the `coverage` folder to view the coverage HTML report.
 
 <img src="pics/coverage.png" alt="segment" width="700">
 
-The `make release` target bundles everything produced by the pipeline into a single distributable artifact. It first ensures the project is built and tested, then collects the application binary, test results (JUnit XML), and analysis reports such as `cppcheck.xml`. These files are packaged into a versioned tarball (named with the project’s git tag or commit SHA) under the `dist/` directory, and a SHA-256 checksum file is generated for integrity verification. This makes it easy to archive or publish a reproducible snapshot of the build, complete with binaries, reports, and metadata, so downstream users or CI/CD systems can consume it as a release artifact.
+The `make package` target bundles everything produced by the pipeline into a single distributable artifact. It first ensures the project is built and tested, then collects the application binary, test results (e.g., JUnit XML), and analysis reports (e.g., `cppcheck.xml`). These files are packaged into a versioned tarball (named with the project’s Git tag or commit SHA) under the `dist/` directory, and a SHA-256 checksum file is generated for integrity verification. This provides a reproducible snapshot of the build, complete with binaries, reports, and metadata, suitable for archival or later publication.
 
-    make release
+    make package

@@ -20,11 +20,6 @@ ifneq ("$(wildcard $(PKGCONF_DIR))","")
   CONAN_LDFLAGS := $(shell PKG_CONFIG_PATH=$(PKGCONF_DIR) pkg-config --libs   $(PKG_MODULES) 2>/dev/null)
   INCLUDES += $(CONAN_CFLAGS)
   LDFLAGS  += $(CONAN_LDFLAGS)
-  $(info [Conan] PKG_CONFIG_PATH=$(PKGCONF_DIR))
-  $(info [Conan] pkg-config --cflags $(PKG_MODULES) => $(CONAN_CFLAGS))
-  $(info [Conan] pkg-config --libs   $(PKG_MODULES) => $(CONAN_LDFLAGS))
-else
-  $(warning [Conan] PKGCONF_DIR '$(PKGCONF_DIR)' not found, skipping Conan integration)
 endif
 
 # ---------------------------
@@ -58,7 +53,7 @@ TEST_BIN  := $(BIN_DIR)/run_tests
 .PHONY: lint format-check format static cppcheck \
         build test test-console \
         coverage coverage-build-internal \
-        release package \
+        package \
         clean distclean
 
 # ---------------------------
@@ -171,11 +166,9 @@ $(COV_OBJ)/%.cpp.o: %.cpp
 	$(CXX) $(BASE_CXXFLAGS) $(COV_ONLY) $(INCLUDES) $(DEPFLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 # ---------------------------
-# Release / Package
+# Package
 # ---------------------------
-release: lint static build test package
-
-package:
+package: lint static build test package
 	@mkdir -p $(DIST_DIR)
 	@VER=$$(git describe --tags --always --dirty 2>/dev/null || echo "0.0.0"); \
 	SHA=$$(git rev-parse --short HEAD 2>/dev/null || echo "dev"); \
@@ -194,7 +187,7 @@ package:
 	tar -czf $$TARBALL --transform "s,^,$$NAME/," $$FILES; \
 	rm -f MANIFEST.txt; \
 	if command -v sha256sum >/dev/null 2>&1; then sha256sum $$TARBALL > $$TARBALL.sha256; fi; \
-	echo "Release artifacts in $(DIST_DIR)/"
+	echo "Saved artifacts in $(DIST_DIR)/"
 
 # ---------------------------
 # Clean
