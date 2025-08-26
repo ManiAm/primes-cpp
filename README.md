@@ -156,7 +156,27 @@ The build stage compiles the project deterministically with strict flags (e.g., 
 
 ### Test
 
-Unit tests validate the behavior of the code. Tests should be fast, hermetic, and deterministic to avoid flaky results. The project uses `Catch2` as the unit test framework with `make test` as the entrypoint. Test runs generate JUnit XML results, which can be consumed by CI systems to visualize pass/fail outcomes and track trends over time. As test volume grows, they can be grouped into categories (unit, integration, regression) and executed in parallel to shorten feedback cycles. Failures should surface with actionable logs so they can be reproduced locally.
+Automated testing is an important part of maintaining code quality. Tests can be grouped into the following groups:
+
+- **Unit Testing**:
+
+    Unit testing verifies the smallest components of the codebase (functions, classes, or modules) in isolation. These tests ensure that individual units behave as expected given specific inputs. Unit tests should avoid external dependencies such as databases or networks, making them fast to execute and deterministic in results. They provide developers with immediate feedback during local development and in CI pipelines.
+
+- **Integration Testing**:
+
+    Integration testing validates that multiple components work correctly when combined. While unit tests prove correctness in isolation, integration tests catch issues that only appear when components interact. For example, a parser feeding data into a calculator or application code calling into a database. Integration tests may involve real or simulated dependencies and tend to run slower than unit tests, but they are critical for uncovering systemic issues.
+
+    A popular analogy highlights the difference between unit and integration testing. Imagine a door secured by both a lock and a latch. A unit test checks that the latch closes correctly when tested in isolation, while an integration test verifies that the latch and the door handle together actually keep the door secure. This distinction illustrates why both levels of testing are needed for confidence in a system’s overall behavior.
+
+    <img src="pics/testing.gif" alt="segment" width="350">
+
+- **Regression Testing**:
+
+    Regression testing ensures that previously working functionality continues to work after new changes are introduced. When a bug is fixed, a regression test is typically added to reproduce the original failure and confirm that it does not recur. Over time, the regression suite becomes a safety net, preventing old issues from reappearing and giving developers confidence when making changes to a growing codebase.
+
+These tests can be executed in parallel to shorten feedback loops. Failures should always produce actionable logs that make issues easy to reproduce locally.
+
+In this project, the `Catch2` framework is used for unit testing, with `make test` as the entry point. Test runs generate JUnit XML output, which can be consumed by CI/CD systems to visualize results, track historical trends, and highlight failures early in the development cycle.
 
 ### Code Coverage
 
