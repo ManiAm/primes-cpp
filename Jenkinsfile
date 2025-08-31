@@ -18,6 +18,12 @@ pipeline {
             }
         }
         stage('Deploy') {
+            when {
+                allOf {
+                    not { changeRequest() }    // block on PRs
+                    anyOf { branch 'master'; buildingTag() }
+                }
+            }
             steps {
                 echo 'Deploying application...'
             }
