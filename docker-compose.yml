@@ -1,0 +1,9 @@
+services:
+
+  primes-cpp:
+    build: .
+    container_name: primes-cpp
+    hostname: primes-cpp
+    restart: unless-stopped
+    stdin_open: true
+    tty: true

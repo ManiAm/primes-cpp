@@ -3,6 +3,8 @@
 Primes-CPP is a small C++ project designed to serve as a practical testbed for a complete CI pipeline.
 The codebase itself is intentionally simple: a minimal library with functions such as integer addition and prime number detection, a thin application entrypoint, and unit tests. By keeping the application itself simple, the project emphasizes the end-to-end automation flow from checkout to publish making it ideal for experimenting with toolchains, validating pipeline configurations, and serving as a template for larger C++ projects.
 
+> For details on how this project is integrated into a full CI/CD workflow, including automated builds, tests, and analysis stages, please refer to the [jenkins-pipeline](https://github.com/ManiAm/Jenkins-pipeline) project.
+
 ## Project Layout
 
 The project is organized as follows:
@@ -50,42 +52,15 @@ C++ lacks a standardized package management system like Python's `pip`, JavaScri
 
 Among C++ package managers, [Conan](https://conan.io/) and [vcpkg](https://vcpkg.io/en/) are the most powerful and widely used tools. `Conan` is generally considered more powerful due to its customizability, enterprise features, and wider platform support. It is written in Python and is the industry standard for handling complex C++ projects. `vcpkg`, while simpler, is more suitable for smaller projects or Windows-based development where ease of setup and integration with Visual Studio are priorities. We are going to use Conan in our project.
 
-## Setting up Conan
-
-You can build and test this project by using Conan as a package manager for a cleaner, virtual-env style workflow. Conan can be used to fetch dependencies without polluting system packages. This also enables an activatable build/run environment, similar to Python’s virtualenv.
-
-Install Conan:
-
-    pip install conan
-
-Initialize configuration:
-
-    conan profile detect --force
-
-This detects and configures the default profile based on your environment
-
-Install dependencies into a local folder:
-
-    conan install . --output-folder=build/conan --build=missing
-
-This generates activation scripts and `pkg-config` files in `build/conan`.
-
-Activate the Conan environment:
-
-    source build/conan/conanbuild.sh
-
-This sets up compilers, include paths, and linker flags from Conan.
-
-Deactivate later with:
-
-    source build/conan/deactivate_conanbuild.sh
-
 ## Getting Started
 
-Install the following tools:
+Start the container in background:
 
-    export DEBIAN_FRONTEND=noninteractive
-    sudo apt install -y pkg-config clang-format cppcheck gcovr
+    docker compose up -d --build
+
+Open an interactive shell to the container:
+
+    docker exec -it primes-cpp bash
 
 To run the code formatting and linting checks:
 
@@ -176,7 +151,7 @@ Automated testing is an important part of maintaining code quality. Tests can be
 
 These tests can be executed in parallel to shorten feedback loops. Failures should always produce actionable logs that make issues easy to reproduce locally.
 
-In this project, the `Catch2` framework is used for unit testing, with `make test` as the entry point. Test runs generate JUnit XML output, which can be consumed by CI/CD systems to visualize results, track historical trends, and highlight failures early in the development cycle.
+In this project, the `Catch2` framework is used for unit testing, with `make test` as the entry point. Test runs generate JUnit XML output, which can be consumed by CI systems to visualize results, track historical trends, and highlight failures early in the development cycle.
 
 ### Code Coverage
 
@@ -202,6 +177,14 @@ A release marks the formal distribution of a software version to end users, dist
 
 ## Ephemeral Docker Build Environment
 
-All build, test, and analysis stages are executed inside ephemeral Docker containers rather than directly on the agents. This design ensures that the host operating systems remain free of build toolchains, language runtimes, or dependency pollution. Each pipeline stage specifies a Docker image appropriate for the task. The Jenkins Docker plugin mounts the workspace into these containers, executes the step, and then disposes of the container after the stage completes.
+The Jenkins pipeline is designed so that all build, test, and analysis stages run inside ephemeral Docker containers rather than directly on the Jenkins agent. At the start of the pipeline, Jenkins builds the project’s Docker image (as defined in the Dockerfile) to encapsulate the full toolchain, dependencies, and runtime environment. Subsequent stages in the Jenkinsfile are executed inside disposable containers instantiated from this freshly built image. This workflow ensures several advantages:
 
-This approach provides several benefits. First, it guarantees a consistent and reproducible build environment across agents regardless of their base operating system. Second, it allows different stages of the same pipeline to use different toolchains without conflict, making polyglot builds straightforward. Finally, because the containers are ephemeral, there is no risk of residual state between builds; every execution starts from a clean image, ensuring high fidelity in test and coverage results.
+- **Clean Separation of Concerns**: The Jenkins agents only need Docker installed; they do not require any compilers, libraries, or runtimes. All dependencies remain confined within the container image.
+
+- **Consistency and Reproducibility**: Because the image is built from a version-controlled Dockerfile, every pipeline run uses the exact same environment. This eliminates "works on my machine" issues and ensures reproducible builds across agents.
+
+- **Polyglot Flexibility**: Different pipelines can provide different Dockerfiles, making it straightforward to support multiple languages or toolchains without cross-contamination.
+
+- **Stateless Execution**: Containers are ephemeral. Once a stage completes, the container is discarded, leaving no residual state behind. Each run starts from a clean, deterministic environment, which improves the reliability of test results, static analysis, and coverage reports.
+
+By adopting this model, the pipeline guarantees that the CI process remains portable, maintainable, and free from dependency drift, while still enabling Jenkins to orchestrate the stages inside containerized environments.
