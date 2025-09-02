@@ -1,3 +1,5 @@
+// Copyright 2025 Mani Amoozadeh
+
 #pragma once
 #include <vector>
 

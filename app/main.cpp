@@ -1,5 +1,7 @@
-#include "calc.h"
+// Copyright 2025 Mani Amoozadeh
+
 #include <iostream>
+#include "src/calc.h"
 
 int main() {
     std::cout << "2 + 3 = " << add(2, 3) << "\n";

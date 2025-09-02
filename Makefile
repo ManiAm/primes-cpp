@@ -9,9 +9,9 @@ DEPFLAGS      := -MMD -MP
 CXX       ?= g++
 CXXFLAGS  ?= $(BASE_CXXFLAGS) $(OPT_CXXFLAGS)
 LDFLAGS   ?=
-INCLUDES  := -Isrc
+INCLUDES  := -I.
 
-# Conan / pkg-config integration
+# Conan integration
 PKGCONF_DIR := $(abspath build/conan)
 PKG_MODULES := catch2-with-main fmt
 
@@ -48,31 +48,56 @@ TEST_OBJS := $(TEST_SRC:%=$(OBJ_DIR)/%.o)
 TEST_BIN  := $(BIN_DIR)/run_tests
 
 # ---------------------------
+# Tools
+# ---------------------------
+FORMATTER      ?= clang-format
+FORMAT_STYLE   ?= -style=file
+
+CPPLINT        ?= cpplint
+CPPLINT_FLAGS  ?= --quiet
+
+# All C/C++ files tracked by git
+SRC_FILES := $(shell git ls-files "*.h" "*.hpp" "*.c" "*.cc" "*.cpp")
+
+# ---------------------------
 # Phony targets
 # ---------------------------
-.PHONY: lint format-check format static cppcheck \
+.PHONY: format-check format lint lint \
+        static cppcheck \
         build test test-console \
         coverage coverage-build-internal \
         package \
         clean distclean
 
 # ---------------------------
-# Lint (clang-format)
+# Code Formatting (clang-format)
 # ---------------------------
-lint: format-check
-	@echo "Linting passed."
-
 format-check:
-	@FILES=$$(git ls-files "*.h" "*.hpp" "*.c" "*.cc" "*.cpp"); \
-	if [ -n "$$FILES" ]; then \
-	  clang-format --dry-run --Werror -style=file $$FILES; \
-	else \
+	@if [ -z "$(SRC_FILES)" ]; then \
 	  echo "No C/C++ files."; \
+	else \
+	  $(FORMATTER) --dry-run --Werror $(FORMAT_STYLE) $(SRC_FILES); \
+	  echo "Format check passed."; \
 	fi
 
 format:
-	@FILES=$$(git ls-files "*.h" "*.hpp" "*.c" "*.cc" "*.cpp"); \
-	[ -z "$$FILES" ] || clang-format -i -style=file $$FILES
+	@if [ -z "$(SRC_FILES)" ]; then \
+	  echo "No C/C++ files."; \
+	else \
+	  $(FORMATTER) -i $(FORMAT_STYLE) $(SRC_FILES); \
+	  echo "Applied formatting."; \
+	fi
+
+# ---------------------------
+# Linting (cpplint)
+# ---------------------------
+lint:
+	@if [ -z "$(SRC_FILES)" ]; then \
+	  echo "No C/C++ files."; \
+	else \
+	  $(CPPLINT) $(CPPLINT_FLAGS) $(SRC_FILES); \
+	  echo "Lint check passed."; \
+	fi
 
 # ---------------------------
 # Static analysis (no compile): cppcheck -> cppcheck.xml
@@ -98,6 +123,14 @@ $(APP_BIN): $(APP_OBJS)
 	@mkdir -p $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Compile rules with auto dep generation (.d files)
+$(OBJ_DIR)/%.cpp.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(DEPFLAGS) -MF $(@:.o=.d) -c $< -o $@
+
+# ---------------------------
+# Test
+# ---------------------------
 test: $(TEST_BIN)
 	@mkdir -p $(TEST_OUT)
 	$(TEST_BIN) --reporter junit --out $(TEST_OUT)/junit.xml
@@ -108,11 +141,6 @@ test-console: $(TEST_BIN)
 $(TEST_BIN): $(TEST_OBJS)
 	@mkdir -p $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Compile rules with auto dep generation (.d files)
-$(OBJ_DIR)/%.cpp.o: %.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(DEPFLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 # ---------------------------
 # Coverage build & report
@@ -168,7 +196,7 @@ $(COV_OBJ)/%.cpp.o: %.cpp
 # ---------------------------
 # Package
 # ---------------------------
-package: lint static build test package
+package: lint static build test
 	@mkdir -p $(DIST_DIR)
 	@VER=$$(git describe --tags --always --dirty 2>/dev/null || echo "0.0.0"); \
 	SHA=$$(git rev-parse --short HEAD 2>/dev/null || echo "dev"); \
@@ -203,6 +231,7 @@ distclean: clean
 # Auto-include dependency files (.d)
 # ---------------------------
 DEPS := $(APP_OBJS:.o=.d) $(TEST_OBJS:.o=.d)
+
 COV_APP_OBJS  := $(APP_SRC:%=$(COV_OBJ)/%.o)
 COV_TEST_OBJS := $(TEST_SRC:%=$(COV_OBJ)/%.o)
 COV_DEPS      := $(COV_APP_OBJS:.o=.d) $(COV_TEST_OBJS:.o=.d)

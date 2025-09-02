@@ -1,5 +1,6 @@
+// Copyright 2025 Mani Amoozadeh
 
-#include "calc.h"
+#include "src/calc.h"
 #include <cmath>
 #include <vector>
 

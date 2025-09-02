@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     git \
     pkg-config \
     clang-format \
+    cpplint \
     cppcheck \
     gcovr
 
@@ -30,3 +31,4 @@ COPY . .
 RUN conan install . --output-folder=build/conan --build=missing
 
 CMD ["/bin/bash"]
+

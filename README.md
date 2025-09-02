@@ -1,9 +1,8 @@
 # Primes-CPP
 
-Primes-CPP is a small C++ project designed to serve as a practical testbed for a complete CI pipeline.
-The codebase itself is intentionally simple: a minimal library with functions such as integer addition and prime number detection, a thin application entrypoint, and unit tests. By keeping the application itself simple, the project emphasizes the end-to-end automation flow from checkout to publish making it ideal for experimenting with toolchains, validating pipeline configurations, and serving as a template for larger C++ projects.
+Primes-CPP is a small C++ project designed to serve as a practical testbed for a complete CI pipeline. The codebase itself is intentionally simple: a minimal library with functions such as integer addition and prime number detection, a thin application entrypoint, and unit tests. By keeping the application itself simple, the project emphasizes the end-to-end automation flow from checkout to publish making it ideal for experimenting with toolchains, validating pipeline configurations, and serving as a template for larger C++ projects.
 
-> For details on how this project is integrated into a full CI/CD workflow, including automated builds, tests, and analysis stages, please refer to the [jenkins-pipeline](https://github.com/ManiAm/Jenkins-pipeline) project.
+> For details on how this project is integrated into a full CI/CD workflow, refer to the [jenkins-pipeline](https://github.com/ManiAm/Jenkins-pipeline) project.
 
 ## Project Layout
 
@@ -20,7 +19,9 @@ The project is organized as follows:
     ├── Makefile              # Build automation rules
     ├── .clang-format         # Code style configuration
     ├── conanfile.txt         # Conan package dependencies
-    └── Jenkinsfile           # CI pipeline definition
+    ├── Jenkinsfile           # CI pipeline definition
+    ├── Dockerfile            # Container build definition
+    └── docker-compose.yml    # Docker compose definition
 
 ### src/
 
@@ -36,7 +37,7 @@ This directory contains unit tests for validating the behavior of code in `src/`
 
 ### Makefile
 
-The Makefile defines one target per CI pipeline stage: lint, static, build, test, coverage, and package. This design ensures that the local developer workflow matches the pipeline exactly. The compiler can be switched easily (`CXX=clang++` or `CXX=g++`) without modifying the Makefile itself.
+The Makefile defines one target per CI pipeline stage: format, lint, static, build, test, coverage, and package. This design ensures that the local developer workflow matches the pipeline exactly. The compiler can be switched easily (`CXX=clang++` or `CXX=g++`) without modifying the Makefile itself.
 
 ## Header File Dependencies
 
@@ -62,25 +63,35 @@ Open an interactive shell to the container:
 
     docker exec -it primes-cpp bash
 
-To run the code formatting and linting checks:
+To run `clang-format` in verification mode:
 
-    make lint
+    make format-check
 
-If linting does not pass, you can auto-apply formatting:
+It checks that all source files comply with the project’s `.clang-format` style. The command fails with an error if formatting is incorrect. It does not modify any files.
+
+To run `clang-format` in in-place mode:
 
     make format
 
-Run static code analysis using cppcheck:
+It automatically rewrites all source files to match the style rules in `.clang-format`.
+
+To run `cpplint`:
+
+    make lint
+
+It reports style and convention issues beyond formatting (e.g., include order, naming, header guards). It does not modify files, only prints warnings or errors.
+
+To run static code analysis using `cppcheck`:
 
     make static
 
 The output is saved into `cppcheck.xml` file.
 
-Compiles the app:
+To compile the app:
 
     make -j build
 
-Run the app:
+To run the app:
 
     ./build/bin/demo
 
@@ -89,7 +100,7 @@ Sample output:
     2 + 3 = 5
     Is 17 prime? yes
 
-Run tests:
+To run tests:
 
     make -j test
 
@@ -97,7 +108,7 @@ The test results are stored in `test-results` folder, and you can print it with:
 
     make test-console
 
-Generate code coverage:
+To generate code coverage:
 
     make coverage
 
@@ -115,65 +126,73 @@ A `Jenkinsfile` is a plain text file, written in Groovy-based syntax, that defin
 
 ### Checkout
 
-The pipeline begins by fetching the exact commit to build and setting up a clean, reproducible workspace. A shallow clone is usually sufficient unless full history is required. Build caches (for example, `ccache`) may be restored to speed up subsequent steps. It is also good practice to record immutable build metadata (commit SHA, branch or PR number, build identifier, and tool versions) so that results are traceable and reproducible.
+The checkout stage is the first step in most CI pipelines and is responsible for retrieving the project’s source code from version control. During this stage, the pipeline fetches the repository at the specific commit or branch associated with the build, ensuring that the build process runs against a consistent snapshot of the codebase. Depending on configuration, this may include checking out submodules, applying shallow clones to reduce network overhead, or verifying commit integrity for security.
+
+### Code Formatting
+
+Code formatting ensures that all source files follow a consistent, automated style. A formatter such as `clang-format` rewrites whitespace, indentation, line wrapping, and brace placement according to rules defined in a `.clang-format` file. Because formatting is deterministic and mechanical, style compliance should be non-negotiable across all branches and pull requests. Developers can use `make format` to automatically reformat files locally, while pre-commit hooks help catch violations before they enter the repository. In continuous integration, `make format-check` enforces compliance and ensures the codebase never drifts from the agreed standard.
 
 ### Linting
 
-Linting enforces consistent code style early in the process, ensuring quick failure before investing time in compilation. For C++, `clang-format --dry-run --Werror -style=file` can be used to enforce formatting rules defined in `.clang-format`. Style compliance should be non-negotiable across all branches and pull requests. For developers, `make format` provides a convenient way to auto-fix style locally, and pre-commit hooks can catch violations before they reach the pipeline. The CI gate (`make format-check`) ensures the codebase never drifts from the agreed standard.
+Linting checks source code for style, convention, and maintainability issues, but typically does not modify files. Linters enforce rules for naming, include ordering, modernization practices, and readability. Unlike a formatter, which only changes layout, linters flag constructs that violate established policy. This project uses `cpplint`, a Python-based tool created by Google for enforcing the Google C++ Style Guide. It provides fast feedback on issues such as missing copyright headers, incorrect include order, or discouraged language features.
+
+There are also more advanced options such as `clang-tidy`. It integrates with the Clang compiler infrastructure and provides checks for readability, modern C++ usage, performance improvements, and even bug-prone constructs. It can suggest replacing raw loops with range-based for loops, flag use of deprecated APIs, detect certain memory misuses, and automatically apply fixes for many issues. While `cpplint` is lightweight and style-focused, `clang-tidy` is better suited for teams looking to enforce modernization and deeper semantic rules in larger or evolving C++ codebases.
 
 ### Static Code Analysis
 
-Static analysis detects correctness, safety, and performance issues without executing the program. A lightweight, compiler-independent tool such as `cppcheck` can analyze source files directly, providing warnings about memory management, portability, style, and potential runtime errors. Its XML output can be integrated into automated pipelines for trend tracking and machine-readable reporting. For CI, it is good practice to treat serious findings as build-breaking, while allowing style or lower-severity issues to surface as warnings for incremental cleanup. Running static analysis early (before the build stage) saves resources and gives developers fast feedback on potential problems. For projects that require deeper semantic checks, `clang-tidy` can also be added to improve accuracy by leveraging real compiler flags and AST analysis.
+Static analysis examines the semantics of a program without executing it. Unlike a formatter (which enforces layout) or a linter (which enforces conventions), static analysis focuses on program correctness: detecting uninitialized variables, null dereferences, memory leaks, portability problems, and potential performance pitfalls. This project uses `cppcheck`, a compiler-independent static analyzer designed specifically for C/C++. It produces both human-readable diagnostics and machine-readable XML output, which can be integrated into CI pipelines for trend tracking and reporting.
+
+In CI/CD, it is best practice to treat serious findings (e.g., undefined behavior, memory safety issues) as build-breaking, while allowing style or lower-severity findings to surface as warnings for incremental cleanup. Running static analysis early in the pipeline provides fast feedback and conserves build resources by catching problems before compilation or runtime tests.
+
+For larger or safety-critical projects, commercial solutions such as `Coverity` (by Synopsys) are also widely used. It provides deep, path-sensitive analysis that scales to millions of lines of code and integrates with enterprise CI/CD systems. It can detect complex defects such as concurrency issues, buffer overruns, resource leaks, and security vulnerabilities that might escape lightweight analyzers. In addition to diagnostics, it offers rich dashboards, compliance tracking (e.g., MISRA, CERT), and management workflows, making it suitable for regulated industries and large engineering organizations where code quality and traceability are non-negotiable.
 
 ### Build
 
 The build stage compiles the project deterministically with strict flags (e.g., `-Wall -Wextra`). The Makefile provides a clear entrypoint and supports switching compilers (`g++` vs. `clang++`). For projects requiring portability, a compiler or OS matrix can be introduced. Build caches like `ccache` help accelerate repeated builds. The output binaries are placed in `build/bin/` and can be archived or passed to later stages (tests, packaging). Explicit dependency versions ensure that builds are reproducible and not subject to "works on my machine" failures.
 
-### Test
+### Unit Testing
 
-Automated testing is an important part of maintaining code quality. Tests can be grouped into the following groups:
-
-- **Unit Testing**:
-
-    Unit testing verifies the smallest components of the codebase (functions, classes, or modules) in isolation. These tests ensure that individual units behave as expected given specific inputs. Unit tests should avoid external dependencies such as databases or networks, making them fast to execute and deterministic in results. They provide developers with immediate feedback during local development and in CI pipelines.
-
-- **Integration Testing**:
-
-    Integration testing validates that multiple components work correctly when combined. While unit tests prove correctness in isolation, integration tests catch issues that only appear when components interact. For example, a parser feeding data into a calculator or application code calling into a database. Integration tests may involve real or simulated dependencies and tend to run slower than unit tests, but they are critical for uncovering systemic issues.
-
-    A popular analogy highlights the difference between unit and integration testing. Imagine a door secured by both a lock and a latch. A unit test checks that the latch closes correctly when tested in isolation, while an integration test verifies that the latch and the door handle together actually keep the door secure. This distinction illustrates why both levels of testing are needed for confidence in a system’s overall behavior.
-
-    <img src="pics/testing.gif" alt="segment" width="350">
-
-- **Regression Testing**:
-
-    Regression testing ensures that previously working functionality continues to work after new changes are introduced. When a bug is fixed, a regression test is typically added to reproduce the original failure and confirm that it does not recur. Over time, the regression suite becomes a safety net, preventing old issues from reappearing and giving developers confidence when making changes to a growing codebase.
-
-These tests can be executed in parallel to shorten feedback loops. Failures should always produce actionable logs that make issues easy to reproduce locally.
+Unit testing verifies the smallest components of the codebase (functions, classes, or modules) in isolation. These tests ensure that individual units behave as expected given specific inputs. Unit tests should avoid external dependencies such as databases or networks, making them fast to execute and deterministic in results. They provide developers with immediate feedback during local development and in CI pipelines.
 
 In this project, the `Catch2` framework is used for unit testing, with `make test` as the entry point. Test runs generate JUnit XML output, which can be consumed by CI systems to visualize results, track historical trends, and highlight failures early in the development cycle.
 
 ### Code Coverage
 
-Code coverage measures how much of the source is exercised by tests, reducing the risk of untested regressions. The project can be built with coverage flag (`--coverage`), after which tests are executed and coverage reports generated using `gcovr`. Reports should include both human-readable HTML and machine-readable formats (e.g., Cobertura XML) for automated enforcement. Coverage gates are best applied pragmatically: enforce no decrease relative to main or set thresholds per change, rather than rigid global minimums that encourage low-value tests.
+Code coverage measures how much of the source is exercised by tests, reducing the risk of untested regressions. Coverage is not a direct measure of test quality, but it is a valuable indicator of risk. While striving for 100% coverage is often impractical and unnecessary, maintaining a high level of coverage ensures that critical paths are validated and reduces the likelihood of undetected regressions.
 
-### Distribution Workflow
+The project can be built with coverage flag (`--coverage`), after which tests are executed and coverage reports generated using `gcovr`. Reports should include both human-readable HTML and machine-readable formats (e.g., Cobertura XML) for automated enforcement. Coverage gates are best applied pragmatically: enforce no decrease relative to main or set thresholds per change, rather than rigid global minimums that encourage low-value tests.
+
+### Package
+
+When builds and tests succeed, outputs are bundled into distributable artifacts. These may include compressed archives (e.g., tarballs, ZIPs), operating system packages (DEB/RPM), or container images. Each artifact should be versioned using semantic versioning with optional commit metadata (e.g., `1.2.0+abc123`) to ensure traceability. To guarantee integrity, checksums (e.g., SHA-256) should be generated, and for supply chain security, additional metadata such as SBOMs (via tools like `syft`) and cryptographic signatures (via tools like `cosign`) can be attached. A well-packaged artifact is minimal containing only the files and dependencies required by consumers and should include concise documentation or metadata describing runtime requirements.
+
+### Integration Testing
+
+Integration testing validates that multiple components work correctly when combined. While unit tests prove correctness in isolation, integration tests catch issues that only appear when components interact. For example, a parser feeding data into a calculator or application code calling into a database. Integration tests may involve real or simulated dependencies and tend to run slower than unit tests, but they are critical for uncovering systemic issues.
+
+A popular analogy highlights the difference between unit and integration testing. Imagine a door secured by both a lock and a latch. A unit test checks that the latch closes correctly when tested in isolation, while an integration test verifies that the latch and the door handle together actually keep the door secure. This distinction illustrates why both levels of testing are needed for confidence in a system’s overall behavior.
+
+<img src="pics/testing.gif" alt="segment" width="350">
+
+### Regression Testing
+
+Regression testing is the process of re-executing previously run test cases to ensure that recent code changes, enhancements, or bug fixes have not unintentionally broken existing functionality. Unlike unit or integration testing, which focus on specific levels of the software (individual components or their interactions), regression testing is a testing strategy applied across all levels. Its primary goal is to confirm that the system continues to behave as expected after modifications.
+
+In practice, regression testing often involves maintaining a suite of automated tests (ranging from unit tests to full end-to-end scenarios) that are rerun whenever the codebase changes. This ensures that new features integrate smoothly, bug fixes do not reappear, and overall system stability is preserved. Because it validates the unchanged parts of a system after updates, regression testing is critical in CI/CD pipelines, where frequent changes must not compromise reliability.
+
+### Publish
+
+Publishing makes validated artifacts available to others by promoting them to their designated destinations under controlled conditions. Targets may include package repositories (e.g., Artifactory, Nexus, PyPI, Maven Central), container registries (e.g., Docker Hub, ECR, GCR), or distribution platforms such as GitHub Releases. Publishing credentials must follow the principle of least privilege and be rotated regularly. Published artifacts should be annotated with changelogs, version tags, and links back to the originating build for full traceability. To strengthen consumer trust, optional metadata such as SLSA provenance attestations, SBOMs, and digital signatures should be attached so downstream systems and users can verify authenticity and integrity before deployment.
+
+### Release
+
+A release marks the formal distribution of a software version to end users, distinguishing it from internal builds or unpublished artifacts. A release is both a technical milestone and a product event, usually represented by a semantic version tag (e.g., `v1.2.0`) in source control. It should be immutable, reproducible, and traceable to a specific commit and build pipeline. A proper release includes release notes summarizing new features, bug fixes, and breaking changes, ideally auto-generated from commits or pull requests. Distribution is handled through established channels such as GitHub/GitLab Releases, customer portals, or internal delivery pipelines. In mature CI processes, releases are gated by quality controls (security scans, compliance checks, stakeholder approvals) and may trigger downstream workflows such as deployment to production or notifications to customers.
+
+In summary:
 
 - Package → Create artifacts
 - Publish → Push artifacts to repositories/registries
 - Release → Tag and announce an official version for end users
-
-**Package**
-
-When builds and tests succeed, outputs are bundled into distributable artifacts. These may include compressed archives (e.g., tarballs, ZIPs), operating system packages (DEB/RPM), or container images. Each artifact should be versioned using semantic versioning with optional commit metadata (e.g., `1.2.0+abc123`) to ensure traceability. To guarantee integrity, checksums (e.g., SHA-256) should be generated, and for supply chain security, additional metadata such as SBOMs (via tools like `syft`) and cryptographic signatures (via tools like `cosign`) can be attached. A well-packaged artifact is minimal containing only the files and dependencies required by consumers and should include concise documentation or metadata describing runtime requirements.
-
-**Publish**
-
-Publishing makes validated artifacts available to others by promoting them to their designated destinations under controlled conditions. Targets may include package repositories (e.g., Artifactory, Nexus, PyPI, Maven Central), container registries (e.g., Docker Hub, ECR, GCR), or distribution platforms such as GitHub Releases. Publishing credentials must follow the principle of least privilege and be rotated regularly. Published artifacts should be annotated with changelogs, version tags, and links back to the originating build for full traceability. To strengthen consumer trust, optional metadata such as SLSA provenance attestations, SBOMs, and digital signatures should be attached so downstream systems and users can verify authenticity and integrity before deployment.
-
-**Release**
-
-A release marks the formal distribution of a software version to end users, distinguishing it from internal builds or unpublished artifacts. A release is both a technical milestone and a product event, usually represented by a semantic version tag (e.g., `v1.2.0`) in source control. It should be immutable, reproducible, and traceable to a specific commit and build pipeline. A proper release includes release notes summarizing new features, bug fixes, and breaking changes, ideally auto-generated from commits or pull requests. Distribution is handled through established channels such as GitHub/GitLab Releases, customer portals, or internal delivery pipelines. In mature CI processes, releases are gated by quality controls (security scans, compliance checks, stakeholder approvals) and may trigger downstream workflows such as deployment to production or notifications to customers.
 
 ## Ephemeral Docker Build Environment
 

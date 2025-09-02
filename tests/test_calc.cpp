@@ -1,8 +1,11 @@
+// Copyright 2025 Mani Amoozadeh
+
+#include <vector>
+
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_all.hpp>
 
-#include "calc.h"
-#include <vector>
+#include "src/calc.h"
 
 TEST_CASE("Add") {
     REQUIRE(add(2, 3) == 5);
