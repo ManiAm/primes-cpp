@@ -48,6 +48,15 @@ TEST_OBJS := $(TEST_SRC:%=$(OBJ_DIR)/%.o)
 TEST_BIN  := $(BIN_DIR)/run_tests
 
 # ---------------------------
+# Smoke test config
+# ---------------------------
+SMOKE_BIN    := $(APP_BIN)
+SMOKE_ARGS   ?=
+SMOKE_OUT    ?= $(BUILD_DIR)/smoke_output.txt
+# Space-separated list of exact substrings to check in the output
+SMOKE_CHECKS ?= "2 + 3 = 5" "Is 17 prime? yes"
+
+# ---------------------------
 # Tools
 # ---------------------------
 FORMATTER      ?= clang-format
@@ -60,13 +69,21 @@ CPPLINT_FLAGS  ?= --quiet
 SRC_FILES := $(shell git ls-files "*.h" "*.hpp" "*.c" "*.cc" "*.cpp")
 
 # ---------------------------
+# Doxygen (C++ docs)
+# ---------------------------
+DOXYGEN   ?= doxygen
+DOXYFILE  ?= Doxyfile
+DOXY_OUT  ?= docs/doxygen/html
+
+# ---------------------------
 # Phony targets
 # ---------------------------
 .PHONY: format-check format lint lint \
         static cppcheck \
         build test test-console \
         coverage coverage-build-internal \
-        package \
+        package smoke \
+		docs docs-open docs-clean \
         clean distclean
 
 # ---------------------------
@@ -127,6 +144,24 @@ $(APP_BIN): $(APP_OBJS)
 $(OBJ_DIR)/%.cpp.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(DEPFLAGS) -MF $(@:.o=.d) -c $< -o $@
+
+# ---------------------------
+# Smoke test
+# ---------------------------
+smoke: $(APP_BIN)
+	@echo "==> Running smoke test..."
+	@mkdir -p $(BUILD_DIR)
+	@set -e; \
+	$(SMOKE_BIN) $(SMOKE_ARGS) > $(SMOKE_OUT); \
+	for pat in $(SMOKE_CHECKS); do \
+	  if ! grep -F -q "$$pat" "$(SMOKE_OUT)"; then \
+	    echo "Smoke test failed: expected '$$pat' in $(SMOKE_OUT)"; \
+	    echo "---- Output ----"; \
+	    cat "$(SMOKE_OUT)"; \
+	    exit 1; \
+	  fi; \
+	done; \
+	echo "Smoke test passed"
 
 # ---------------------------
 # Test
@@ -194,6 +229,52 @@ $(COV_OBJ)/%.cpp.o: %.cpp
 	$(CXX) $(BASE_CXXFLAGS) $(COV_ONLY) $(INCLUDES) $(DEPFLAGS) -MF $(@:.o=.d) -c $< -o $@
 
 # ---------------------------
+# Docs (Doxygen)
+# ---------------------------
+docs: ## Build Doxygen HTML docs
+	@if ! command -v $(DOXYGEN) >/dev/null 2>&1; then \
+	  echo "Error: doxygen not found. Install it (e.g., 'sudo apt-get install doxygen graphviz')."; \
+	  exit 1; \
+	fi
+	@if [ ! -f "$(DOXYFILE)" ]; then \
+	  echo "Generating default $(DOXYFILE) ..."; \
+	  $(DOXYGEN) -g "$(DOXYFILE)"; \
+	  echo "" >> "$(DOXYFILE)"; \
+	  echo "# --- Project overrides ---" >> "$(DOXYFILE)"; \
+	  echo 'PROJECT_NAME        = "demo"' >> "$(DOXYFILE)"; \
+	  echo 'OUTPUT_DIRECTORY    = docs/doxygen' >> "$(DOXYFILE)"; \
+	  echo 'GENERATE_HTML       = YES' >> "$(DOXYFILE)"; \
+	  echo 'GENERATE_LATEX      = NO' >> "$(DOXYFILE)"; \
+	  echo 'RECURSIVE           = YES' >> "$(DOXYFILE)"; \
+	  echo 'INPUT               = src app include' >> "$(DOXYFILE)"; \
+	  echo 'FILE_PATTERNS       = *.h *.hpp *.c *.cc *.cpp' >> "$(DOXYFILE)"; \
+	  echo 'EXTRACT_ALL         = YES' >> "$(DOXYFILE)"; \
+	  echo 'WARN_IF_UNDOCUMENTED= NO' >> "$(DOXYFILE)"; \
+	  echo 'QUIET               = YES' >> "$(DOXYFILE)"; \
+	  if command -v dot >/dev/null 2>&1; then \
+	    echo 'HAVE_DOT           = YES' >> "$(DOXYFILE)"; \
+	    echo 'CALL_GRAPH         = NO'  >> "$(DOXYFILE)"; \
+	    echo 'INCLUDE_GRAPH      = YES' >> "$(DOXYFILE)"; \
+	    echo 'INCLUDED_BY_GRAPH  = YES' >> "$(DOXYFILE)"; \
+	  fi; \
+	fi
+	@$(DOXYGEN) "$(DOXYFILE)"
+	@echo "Docs HTML at $(DOXY_OUT)/index.html"
+
+docs-open: ## Open the generated HTML docs
+	@path="$(DOXY_OUT)/index.html"; \
+	if [ -f "$$path" ]; then \
+	  (xdg-open "$$path" >/dev/null 2>&1 || open "$$path" || echo "Open: $$path"); \
+	else \
+	  echo "Docs not found. Run 'make docs' first."; \
+	  exit 1; \
+	fi
+
+docs-clean: ## Remove generated Doxygen artifacts
+	@rm -rf docs/doxygen
+	@echo "Removed docs/doxygen"
+
+# ---------------------------
 # Package
 # ---------------------------
 package: lint static build test
@@ -223,6 +304,8 @@ package: lint static build test
 clean:
 	@rm -rf $(BUILD_DIR) $(COV_BUILD) $(TEST_OUT) $(COV_OUT) \
 	        clang-tidy.log cppcheck.xml
+	@rm -f $(SMOKE_OUT)
+	@rm -rf docs/doxygen
 
 distclean: clean
 	@rm -rf $(DIST_DIR)

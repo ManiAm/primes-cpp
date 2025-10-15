@@ -11,7 +11,9 @@ RUN apt-get update && apt-get install -y \
     clang-format \
     cpplint \
     cppcheck \
-    gcovr
+    gcovr \
+    doxygen \
+    graphviz
 
 RUN python3 -m venv /opt/venv
 

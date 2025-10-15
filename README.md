@@ -91,14 +91,11 @@ To compile the app:
 
     make -j build
 
-To run the app:
+To run a quick smoke test after building:
 
-    ./build/bin/demo
+    make smoke
 
-Sample output:
-
-    2 + 3 = 5
-    Is 17 prime? yes
+This will verify that it runs correctly and produces the expected minimal output. The smoke test acts as a lightweight sanity check before running the full test suite.
 
 To run tests:
 
@@ -150,6 +147,12 @@ For larger or safety-critical projects, commercial solutions such as `Coverity` 
 
 The build stage compiles the project deterministically with strict flags (e.g., `-Wall -Wextra`). The Makefile provides a clear entrypoint and supports switching compilers (`g++` vs. `clang++`). For projects requiring portability, a compiler or OS matrix can be introduced. Build caches like `ccache` help accelerate repeated builds. The output binaries are placed in `build/bin/` and can be archived or passed to later stages (tests, packaging). Explicit dependency versions ensure that builds are reproducible and not subject to "works on my machine" failures.
 
+### Smoke Test
+
+A smoke test in C++ is a lightweight check performed immediately after a successful build to ensure that the compiled binary is minimally functional. It verifies that the application compiles, links, launches, and runs without crashing, and that basic output or initialization behaves as expected (for example, producing known console results or initializing key modules). The goal is not to validate correctness or cover all features, but simply to confirm that the build is healthy and executable (stable enough to proceed with unit or integration testing). A failing smoke test typically signals a critical issue such as a broken dependency, runtime crash, or mislinked library that must be resolved before deeper tests are worthwhile.
+
+> The term originates from hardware engineering. When technicians powered on a newly assembled circuit board for the first time, their simplest test was to see whether it emitted smoke. If it did, something was fundamentally broken and they stopped there. This pragmatic check carried over into software engineering as a metaphor for catching catastrophic failures early. Today, in CI/CD pipelines, smoke tests serve as the first line of defense. They are fast, lightweight checks that prevent wasting time and resources on builds that are already "smoking".
+
 ### Unit Testing
 
 Unit testing verifies the smallest components of the codebase (functions, classes, or modules) in isolation. These tests ensure that individual units behave as expected given specific inputs. Unit tests should avoid external dependencies such as databases or networks, making them fast to execute and deterministic in results. They provide developers with immediate feedback during local development and in CI pipelines.
@@ -161,6 +164,12 @@ In this project, the `Catch2` framework is used for unit testing, with `make tes
 Code coverage measures how much of the source is exercised by tests, reducing the risk of untested regressions. Coverage is not a direct measure of test quality, but it is a valuable indicator of risk. While striving for 100% coverage is often impractical and unnecessary, maintaining a high level of coverage ensures that critical paths are validated and reduces the likelihood of undetected regressions.
 
 The project can be built with coverage flag (`--coverage`), after which tests are executed and coverage reports generated using `gcovr`. Reports should include both human-readable HTML and machine-readable formats (e.g., Cobertura XML) for automated enforcement. Coverage gates are best applied pragmatically: enforce no decrease relative to main or set thresholds per change, rather than rigid global minimums that encourage low-value tests.
+
+### Documentation
+
+Documentation is a critical component of any C++ project. Its purpose is to explain how the system is built, how to use it, and how others can extend or integrate with it. Clear documentation reduces onboarding time for new developers, helps users understand APIs and build procedures, and ensures long-term maintainability by preserving the reasoning behind design choices. Without proper documentation, even well-architected C++ code can become difficult to use or evolve, as implementation details often hide intent and constraints.
+
+For this project, we are using Doxygen to generate documentation. [Doxygen](https://www.doxygen.nl/) is the most widely used documentation system in the C++ ecosystem. It parses source files and extracts specially formatted comments to generate structured documentation in HTML, PDF, or man page formats. Doxygen can integrate with CMake and can automatically cross-link class hierarchies, namespaces, function signatures, and dependency graphs using Graphviz.
 
 ### Package
 
