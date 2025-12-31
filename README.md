@@ -39,84 +39,6 @@ This directory contains unit tests for validating the behavior of code in `src/`
 
 The Makefile defines one target per CI pipeline stage: format, lint, static, build, test, coverage, and package. This design ensures that the local developer workflow matches the pipeline exactly. The compiler can be switched easily (`CXX=clang++` or `CXX=g++`) without modifying the Makefile itself.
 
-## Header File Dependencies
-
-In C++ projects, header file dependencies are a critical aspect of reliable builds. When a header file is modified, every source file that includes it must be recompiled to ensure consistency. If the build system is unaware of these dependencies, it may skip recompilation, leaving behind stale object files. This can result in subtle issues such as mismatched symbols, linker errors, or even runtime crashes caused by outdated code.
-
-For small projects, manually specifying which sources depend on which headers might be manageable, but in larger codebases this quickly becomes error-prone and difficult to maintain. Modern build workflows avoid this by automatically generating dependency files (commonly `.d` files produced by compilers with flags like `-MMD -MP` in GCC/Clang) and including them in the build process. With this approach, any change to a header automatically triggers recompilation of all dependent sources, keeping the build consistent without manual intervention.
-
-While `Make` can handle dependency files effectively, other build systems such as CMake, Meson, or Bazel provide more advanced and integrated dependency tracking. These tools simplify large-scale builds by managing header dependencies transparently, improving correctness and developer productivity.
-
-## C++ Package Managers
-
-C++ lacks a standardized package management system like Python's `pip`, JavaScript's `npm` or Java's `Maven`. Manually managing dependencies often leads to errors, compatibility issues, and duplication. C++ package managers are specialized tools designed to manage C++ libraries and their dependencies in software development projects. They handle source code, prebuilt binaries, versioning, and build configurations, integrating with many build systems.
-
-Among C++ package managers, [Conan](https://conan.io/) and [vcpkg](https://vcpkg.io/en/) are the most powerful and widely used tools. `Conan` is generally considered more powerful due to its customizability, enterprise features, and wider platform support. It is written in Python and is the industry standard for handling complex C++ projects. `vcpkg`, while simpler, is more suitable for smaller projects or Windows-based development where ease of setup and integration with Visual Studio are priorities. We are going to use Conan in our project.
-
-## Getting Started
-
-Start the container in background:
-
-    docker compose up -d --build
-
-Open an interactive shell to the container:
-
-    docker exec -it primes-cpp bash
-
-To run `clang-format` in verification mode:
-
-    make format-check
-
-It checks that all source files comply with the project’s `.clang-format` style. The command fails with an error if formatting is incorrect. It does not modify any files.
-
-To run `clang-format` in in-place mode:
-
-    make format
-
-It automatically rewrites all source files to match the style rules in `.clang-format`.
-
-To run `cpplint`:
-
-    make lint
-
-It reports style and convention issues beyond formatting (e.g., include order, naming, header guards). It does not modify files, only prints warnings or errors.
-
-To run static code analysis using `cppcheck`:
-
-    make static
-
-The output is saved into `cppcheck.xml` file.
-
-To compile the app:
-
-    make -j build
-
-To run a quick smoke test after building:
-
-    make smoke
-
-This will verify that it runs correctly and produces the expected minimal output. The smoke test acts as a lightweight sanity check before running the full test suite.
-
-To run tests:
-
-    make -j test
-
-The test results are stored in `test-results` folder, and you can print it with:
-
-    make test-console
-
-To generate code coverage:
-
-    make coverage
-
-Open the `coverage` folder to view the coverage HTML report.
-
-<img src="pics/coverage.png" alt="segment" width="700">
-
-The `make package` target bundles everything produced by the pipeline into a single distributable artifact. It first ensures the project is built and tested, then collects the application binary, test results (e.g., JUnit XML), and analysis reports (e.g., `cppcheck.xml`). These files are packaged into a versioned tarball (named with the project’s Git tag or commit SHA) under the `dist/` directory, and a SHA-256 checksum file is generated for integrity verification. This provides a reproducible snapshot of the build, complete with binaries, reports, and metadata, suitable for archival or later publication.
-
-    make package
-
 ## CI Pipeline
 
 A `Jenkinsfile` is a plain text file, written in Groovy-based syntax, that defines a Jenkins pipeline as code. It specifies the stages, steps, and environment required to build, test, and deploy an application, providing a reproducible and version-controlled automation process directly alongside the source code. By treating the pipeline as code, teams gain consistency, collaboration, and traceability, since changes to the CI process are reviewed, versioned, and managed just like application code. Each branch, tag, or commit can carry its own pipeline definition, making the CI process fully reproducible and context-aware.
@@ -216,3 +138,81 @@ The Jenkins pipeline is designed so that all build, test, and analysis stages ru
 - **Stateless Execution**: Containers are ephemeral. Once a stage completes, the container is discarded, leaving no residual state behind. Each run starts from a clean, deterministic environment, which improves the reliability of test results, static analysis, and coverage reports.
 
 By adopting this model, the pipeline guarantees that the CI process remains portable, maintainable, and free from dependency drift, while still enabling Jenkins to orchestrate the stages inside containerized environments.
+
+## Getting Started
+
+Start the container in background:
+
+    docker compose up -d --build
+
+Open an interactive shell to the container:
+
+    docker exec -it primes-cpp bash
+
+To run `clang-format` in verification mode:
+
+    make format-check
+
+It checks that all source files comply with the project’s `.clang-format` style. The command fails with an error if formatting is incorrect. It does not modify any files.
+
+To run `clang-format` in in-place mode:
+
+    make format
+
+It automatically rewrites all source files to match the style rules in `.clang-format`.
+
+To run `cpplint`:
+
+    make lint
+
+It reports style and convention issues beyond formatting (e.g., include order, naming, header guards). It does not modify files, only prints warnings or errors.
+
+To run static code analysis using `cppcheck`:
+
+    make static
+
+The output is saved into `cppcheck.xml` file.
+
+To compile the app:
+
+    make -j build
+
+To run a quick smoke test after building:
+
+    make smoke
+
+This will verify that it runs correctly and produces the expected minimal output. The smoke test acts as a lightweight sanity check before running the full test suite.
+
+To run tests:
+
+    make -j test
+
+The test results are stored in `test-results` folder, and you can print it with:
+
+    make test-console
+
+To generate code coverage:
+
+    make coverage
+
+Open the `coverage` folder to view the coverage HTML report.
+
+<img src="pics/coverage.png" alt="segment" width="700">
+
+The `make package` target bundles everything produced by the pipeline into a single distributable artifact. It first ensures the project is built and tested, then collects the application binary, test results (e.g., JUnit XML), and analysis reports (e.g., `cppcheck.xml`). These files are packaged into a versioned tarball (named with the project’s Git tag or commit SHA) under the `dist/` directory, and a SHA-256 checksum file is generated for integrity verification. This provides a reproducible snapshot of the build, complete with binaries, reports, and metadata, suitable for archival or later publication.
+
+    make package
+
+## Header File Dependencies
+
+In C++ projects, header file dependencies are a critical aspect of reliable builds. When a header file is modified, every source file that includes it must be recompiled to ensure consistency. If the build system is unaware of these dependencies, it may skip recompilation, leaving behind stale object files. This can result in subtle issues such as mismatched symbols, linker errors, or even runtime crashes caused by outdated code.
+
+For small projects, manually specifying which sources depend on which headers might be manageable, but in larger codebases this quickly becomes error-prone and difficult to maintain. Modern build workflows avoid this by automatically generating dependency files (commonly `.d` files produced by compilers with flags like `-MMD -MP` in GCC/Clang) and including them in the build process. With this approach, any change to a header automatically triggers recompilation of all dependent sources, keeping the build consistent without manual intervention.
+
+While `Make` can handle dependency files effectively, other build systems such as CMake, Meson, or Bazel provide more advanced and integrated dependency tracking. These tools simplify large-scale builds by managing header dependencies transparently, improving correctness and developer productivity.
+
+## C++ Package Managers
+
+C++ lacks a standardized package management system like Python's `pip`, JavaScript's `npm` or Java's `Maven`. Manually managing dependencies often leads to errors, compatibility issues, and duplication. C++ package managers are specialized tools designed to manage C++ libraries and their dependencies in software development projects. They handle source code, prebuilt binaries, versioning, and build configurations, integrating with many build systems.
+
+Among C++ package managers, [Conan](https://conan.io/) and [vcpkg](https://vcpkg.io/en/) are the most powerful and widely used tools. `Conan` is generally considered more powerful due to its customizability, enterprise features, and wider platform support. It is written in Python and is the industry standard for handling complex C++ projects. `vcpkg`, while simpler, is more suitable for smaller projects or Windows-based development where ease of setup and integration with Visual Studio are priorities. We are going to use Conan in our project.
