@@ -258,6 +258,7 @@ docs: ## Build Doxygen HTML docs
 	    echo 'INCLUDED_BY_GRAPH  = YES' >> "$(DOXYFILE)"; \
 	  fi; \
 	fi
+	@mkdir -p docs/doxygen
 	@$(DOXYGEN) "$(DOXYFILE)"
 	@echo "Docs HTML at $(DOXY_OUT)/index.html"
 
@@ -302,7 +303,7 @@ package: lint static build test
 # Clean
 # ---------------------------
 clean:
-	@rm -rf $(BUILD_DIR) $(COV_BUILD) $(TEST_OUT) $(COV_OUT) \
+	@rm -rf $(OBJ_DIR) $(BIN_DIR) $(COV_BUILD) $(TEST_OUT) $(COV_OUT) \
 	        clang-tidy.log cppcheck.xml
 	@rm -f $(SMOKE_OUT)
 	@rm -rf docs/doxygen

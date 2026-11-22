@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     git \
     pkg-config \
+    cmake \
     clang-format \
     cpplint \
     cppcheck \
